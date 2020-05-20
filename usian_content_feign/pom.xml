@@ -9,21 +9,22 @@
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
-    <artifactId>usian_item_feign</artifactId>
+    <artifactId>usian_content_feign</artifactId>
     <dependencies>
         <!--Spring Cloud OpenFeign Starter -->
         <dependency>
             <groupId>org.springframework.cloud</groupId>
             <artifactId>spring-cloud-starter-openfeign</artifactId>
         </dependency>
+        <!--utils -->
         <dependency>
             <groupId>com.usian</groupId>
-            <artifactId>common_pojo</artifactId>
+            <artifactId>common_utils</artifactId>
             <version>1.0-SNAPSHOT</version>
         </dependency>
         <dependency>
             <groupId>com.usian</groupId>
-            <artifactId>common_utils</artifactId>
+            <artifactId>common_pojo</artifactId>
             <version>1.0-SNAPSHOT</version>
         </dependency>
     </dependencies>
