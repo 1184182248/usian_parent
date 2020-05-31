@@ -13,17 +13,19 @@ import java.util.List;
 @RestController
 @RequestMapping("/backend/itemCategory")
 public class ItemCategoryController {
+
     @Autowired
     private ItemServiceFeignClient itemServiceFeignClient;
 
     /**
-     * 根据类目 ID 查询当前类目的子节点
+     * 根据类目id查询当前类目的字节点
+     * @param id
+     * @return Result
      */
     @RequestMapping("/selectItemCategoryByParentId")
-    public Result selectItemCategoryByParentId(@RequestParam(
-                				defaultValue = "0") Long id) {
+    public Result selectItemCategoryByParentId(@RequestParam(defaultValue = "0") Long id){
         List<TbItemCat> list = itemServiceFeignClient.selectItemCategoryByParentId(id);
-        if (list != null && list.size() > 0) {
+        if(list != null && list.size() > 0){
             return Result.ok(list);
         }
         return Result.error("查无结果");

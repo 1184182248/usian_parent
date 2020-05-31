@@ -348,6 +348,8 @@ public class TbItemParamExample {
 
     public static class Criteria extends GeneratedCriteria {
 
+        public Object andParentIdEqualTo;
+
         protected Criteria() {
             super();
         }

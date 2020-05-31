@@ -9,8 +9,7 @@
     </parent>
     <modelVersion>4.0.0</modelVersion>
 
-    <artifactId>usian_item_service</artifactId>
-
+    <artifactId>usian_portal_web</artifactId>
     <dependencies>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -21,23 +20,15 @@
             <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
         </dependency>
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-devtools</artifactId>
-        </dependency>
-        <dependency>
             <groupId>com.usian</groupId>
-            <artifactId>common_mapper</artifactId>
+            <artifactId>usian_item_feign</artifactId>
             <version>1.0-SNAPSHOT</version>
         </dependency>
         <dependency>
             <groupId>com.usian</groupId>
-            <artifactId>common_utils</artifactId>
-            <version>1.0-SNAPSHOT</version>
-        </dependency>
-        <dependency>
-            <groupId>com.usian</groupId>
-            <artifactId>common_redis</artifactId>
+            <artifactId>usian_content_feign</artifactId>
             <version>1.0-SNAPSHOT</version>
         </dependency>
     </dependencies>
+
 </project>

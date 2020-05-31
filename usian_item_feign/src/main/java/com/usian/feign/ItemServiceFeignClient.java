@@ -3,11 +3,13 @@ package com.usian.feign;
 import com.usian.pojo.TbItem;
 import com.usian.pojo.TbItemCat;
 import com.usian.pojo.TbItemParam;
+import com.usian.utils.CatResult;
 import com.usian.utils.PageResult;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @FeignClient(value = "usian-item-service")
 public interface ItemServiceFeignClient {
@@ -27,13 +29,50 @@ public interface ItemServiceFeignClient {
     @PostMapping("/service/item/insertTbItem")
     Integer insertTbItem(@RequestBody TbItem tbItem, @RequestParam String desc,
                                 @RequestParam String itemParams);
-    @RequestMapping("/service/itemParam/selectItemParamAll")
-    PageResult selectItemParamAll(@RequestParam Integer page, @RequestParam Integer rows);
 
+    /**
+     * 商品添加
+     * @param itemCatId
+     * @param paramData
+     * @return
+     */
     @RequestMapping("/service/itemParam/insertItemParam")
     Integer insertItemParam(@RequestParam Long itemCatId, @RequestParam String paramData);
 
     @RequestMapping("/service/itemParam/deleteItemParamById")
     Integer deleteItemParamById(@RequestParam Long id);
+
+    @RequestMapping("/service/itemParam/selectItemParamAll")
+    PageResult selectItemParamAll(@RequestParam("page") Integer page,
+                                  @RequestParam("rows") Integer rows);
+
+    @RequestMapping("/service/itemCategory/selectItemCategoryAll")
+    CatResult selectItemCategoryAll();
+
+    /**
+     * 根据id删除商品
+     * @param itemId
+     * @return
+     */
+    @RequestMapping("/service/item/deleteItemById")
+    Integer deleteItemById(@RequestParam Long itemId);
+
+    /**
+     * 回显商品
+     * @param itemId
+     * @return
+     */
+    @RequestMapping("/service/item/preUpdateItem")
+    Map<String, Object> preUpdateItem(@RequestParam("itemId") Long itemId);
+
+    /**
+     * 商品修改
+     * @param tbItem
+     * @param desc
+     * @param itemParams
+     * @return
+     */
+    @RequestMapping("/service/item/updateTbItem")
+    Integer updateTbItem(TbItem tbItem,@RequestParam String desc, @RequestParam String itemParams);
 }
 
