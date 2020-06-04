@@ -174,3 +174,26 @@
             searchSourceBuilder.query(boolQueryBuilder);
             searchRequest.source(searchSourceBuilder);
             searchResponse = restHighLevelClient.search(searchRequest,RequestOptions.DEFAULT);
+2020.6.4日报
+    搭建ES集群
+        拷贝节点elasticsearch-1，修改elasticsearch.yml
+        查看集群健康状态：GET _cluster/health
+    展示商品信息导入到索引库
+        创建工程usian_search_service
+            pom：elasticsearch-rest-high-level-client、elasticsearch
+            application.yml：spring:
+                                datasource:
+                                    driver-class-name: com.mysql.jdbc.Driver
+                                    url: jdbc:mysql://127.0.0.1:3306/usian?characterEncoding=UTF-8
+        创建usian_search_feign
+        创建usian_search_web
+            application.yml：ribbon:
+                              ConnectTimeout: 60000、  ReadTimeout: 60000
+        usian-manage-web
+            修改src\api\base.js
+                baseSearchUrl:"/search_api"
+                importAll:"/frontend/searchItem/importAll" // 一键导入商品数据到索引库
+            修改src\api\index.js
+               axios.post(base.baseSearchUrl + base.importAll,null,{timeout:50000});
+            修改src\pages\Product\ProductList\index.vue
+            修改vue.config.js

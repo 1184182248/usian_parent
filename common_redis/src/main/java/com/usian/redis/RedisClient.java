@@ -122,7 +122,7 @@ public class RedisClient {
      * @param item 项 不能为null
      * @return 值
      */
-    public Object hget(String key, Long item){
+    public Object hget(String key, String item){
         return redisTemplate.opsForHash().get(key, item);
     }
 
@@ -133,7 +133,7 @@ public class RedisClient {
      * @param value 值
      * @return true 成功 false失败
      */
-    public boolean hset(String key, Long item, Object value) {
+    public boolean hset(String key, String item, Object value) {
         try {
             redisTemplate.opsForHash().put(key, item, value);
             return true;

@@ -18,8 +18,14 @@
         <module name="usian_item_service" />
         <module name="usian_item_web" />
         <module name="usian_portal_web" />
+        <module name="usian_search_feign" />
+        <module name="usian_search_service" />
+        <module name="usian_search_web" />
       </profile>
     </annotationProcessing>
+    <bytecodeTargetLevel>
+      <module name="springboot_elasticsearch" target="1.7" />
+    </bytecodeTargetLevel>
   </component>
   <component name="JavacSettings">
     <option name="ADDITIONAL_OPTIONS_OVERRIDE">
@@ -28,6 +34,7 @@
       <module name="common_pojo" options="-parameters" />
       <module name="common_redis" options="-parameters" />
       <module name="common_utils" options="-parameters" />
+      <module name="springboot_elasticsearch" options="-parameters" />
       <module name="usian_content_feign" options="-parameters" />
       <module name="usian_content_service" options="-parameters" />
       <module name="usian_content_web" options="-parameters" />
@@ -36,6 +43,9 @@
       <module name="usian_item_web" options="-parameters" />
       <module name="usian_parent" options="-parameters" />
       <module name="usian_portal_web" options="-parameters" />
+      <module name="usian_search_feign" options="-parameters" />
+      <module name="usian_search_service" options="-parameters" />
+      <module name="usian_search_web" options="-parameters" />
     </option>
   </component>
 </project>

@@ -56,7 +56,7 @@ public class ContentServiceImpl implements ContentService {
     public Integer insertTbContent(TbContent tbContent) {
         tbContent.setUpdated(new Date());
         tbContent.setCreated(new Date());
-        redisClient.del(PORTAL_AD_KEY);
+        redisClient.hdel(PORTAL_AD_KEY,AD_CATEGORY_ID.toString());
         return this.tbContentMapper.insertSelective(tbContent);
 
     }
@@ -68,7 +68,7 @@ public class ContentServiceImpl implements ContentService {
      */
     @Override
     public Integer deleteContentByIds(Long ids) {
-        redisClient.del(PORTAL_AD_KEY);
+        redisClient.hdel(PORTAL_AD_KEY,AD_CATEGORY_ID.toString());
         return tbContentMapper.deleteByPrimaryKey(ids);
     }
 
@@ -93,7 +93,7 @@ public class ContentServiceImpl implements ContentService {
      */
     @Override
     public List<AdNode> selectFrontendContentByAD() {
-        List<AdNode> adNodeListRedis = (List<AdNode>) redisClient.get(PORTAL_AD_KEY);
+        List<AdNode> adNodeListRedis = (List<AdNode>) redisClient.hget(PORTAL_AD_KEY,AD_CATEGORY_ID.toString());
         if (adNodeListRedis!=null){
             System.out.println("====从redis中获取大广告====");
             return adNodeListRedis;
@@ -117,7 +117,7 @@ public class ContentServiceImpl implements ContentService {
             adNodeList.add(adNode);
         }
         //添加到缓存
-        redisClient.set(PORTAL_AD_KEY,adNodeList);
+        redisClient.hset(PORTAL_AD_KEY,AD_CATEGORY_ID.toString(),adNodeList);
         System.out.println("====从后台查询====");
         return adNodeList;
     }
