@@ -10,6 +10,7 @@ import com.usian.pojo.*;
 import com.usian.utils.IDUtils;
 import com.usian.utils.PageResult;
 import com.usian.utils.Result;
+import org.springframework.amqp.core.AmqpTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,6 +36,8 @@ public class ItemServiceImpl implements ItemService{
     @Autowired
     private TbItemParamItemMapper tbItemParamItemMapper;
 
+    @Autowired
+    private AmqpTemplate amqpTemplate;
 
     @Override
     public TbItem selectItemInfo(Long itemId) {
@@ -89,9 +92,10 @@ public class ItemServiceImpl implements ItemService{
         tbItemParamItem.setParamData(itemParams);
         tbItemParamItem.setUpdated(date);
         tbItemParamItem.setCreated(date);
-        Integer itemParamItmeNum =
-                tbItemParamItemMapper.insertSelective(tbItemParamItem);
+        Integer itemParamItmeNum = tbItemParamItemMapper.insertSelective(tbItemParamItem);
 
+        //添加商品发布消息到mq
+        amqpTemplate.convertAndSend("item_exchage","item.add", itemId);
             return tbItemNum + tbitemDescNum + itemParamItmeNum;
     }
     /**

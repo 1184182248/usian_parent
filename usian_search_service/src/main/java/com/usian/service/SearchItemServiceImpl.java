@@ -8,18 +8,29 @@ import org.elasticsearch.action.admin.indices.create.CreateIndexResponse;
 import org.elasticsearch.action.admin.indices.get.GetIndexRequest;
 import org.elasticsearch.action.bulk.BulkRequest;
 import org.elasticsearch.action.index.IndexRequest;
+import org.elasticsearch.action.index.IndexResponse;
+import org.elasticsearch.action.search.SearchRequest;
+import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.client.IndicesClient;
 import org.elasticsearch.client.RequestOptions;
 import org.elasticsearch.client.RestHighLevelClient;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.xcontent.XContentType;
+import org.elasticsearch.index.query.QueryBuilders;
+import org.elasticsearch.search.SearchHit;
+import org.elasticsearch.search.SearchHits;
+import org.elasticsearch.search.builder.SearchSourceBuilder;
+import org.elasticsearch.search.fetch.subphase.highlight.HighlightBuilder;
+import org.elasticsearch.search.fetch.subphase.highlight.HighlightField;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @Transactional
@@ -67,6 +78,39 @@ public class SearchItemServiceImpl implements SearchItemService{
             e.printStackTrace();
             return false;
         }
+    }
+
+    @Override
+    public List<SearchItem> selectByq(String q, Long page, Integer pageSize) throws IOException {
+        SearchRequest searchRequest = new SearchRequest(ES_INDEX_NAME).types(ES_TYPE_NAME);
+        SearchSourceBuilder searchSourceBuilder = new SearchSourceBuilder();
+        searchSourceBuilder.query(QueryBuilders.multiMatchQuery(q,
+                new String[]{"item_title","item_sell_point","item_category_name","item_desc"}));
+        searchSourceBuilder.from(Integer.parseInt(String.valueOf(page))-1);
+        searchSourceBuilder.size(pageSize);
+        HighlightBuilder highlightBuilder = new HighlightBuilder();
+        highlightBuilder.preTags("<font style='color:red'>");
+        highlightBuilder.postTags("</font>");
+        highlightBuilder.field("item_title");
+        searchSourceBuilder.highlighter(highlightBuilder);
+        searchRequest.source(searchSourceBuilder);
+        SearchResponse searchResponse =
+                restHighLevelClient.search(searchRequest,RequestOptions.DEFAULT);
+        SearchHits searchHits = searchResponse.getHits();
+        SearchHit[] hits = searchHits.getHits();
+        List<SearchItem> searchItemList = new ArrayList<SearchItem>();
+        for (int i = 0; i < hits.length; i++) {
+            SearchHit hit = hits[i];
+            SearchItem searchItem = JsonUtils.jsonToPojo(hit.getSourceAsString(),
+                    SearchItem.class);
+            Map<String, HighlightField> highlightFields = hit.getHighlightFields();
+            if(highlightFields.get("item_title")!=null){
+                searchItem.setItem_title(highlightFields.get("item_title")
+                        .getFragments()[0].toString());
+            }
+            searchItemList.add(searchItem);
+        }
+        return searchItemList;
     }
 
     /**
@@ -133,5 +177,18 @@ public class SearchItemServiceImpl implements SearchItemService{
             indices.create(createIndexRequest,RequestOptions.DEFAULT);
         //得到响应结果
         return createIndexResponse.isAcknowledged();
+    }
+
+    @Override
+    public int insertDocument(String itemId) throws IOException {
+        // 1、根据商品id查询商品信息。
+        SearchItem searchItem = searchItemMapper.getItemById(Long.valueOf(itemId));
+
+        //2、添加商品到索引库
+        IndexRequest indexRequest = new IndexRequest(ES_INDEX_NAME, ES_TYPE_NAME);
+        indexRequest.source(JsonUtils.objectToJson(searchItem), XContentType.JSON);
+        IndexResponse indexResponse =
+                restHighLevelClient.index(indexRequest,RequestOptions.DEFAULT);
+        return indexResponse.getShardInfo().getFailed();
     }
 }
