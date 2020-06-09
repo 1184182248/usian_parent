@@ -1,0 +1,32 @@
+spring:
+  application:
+    name: usian-sso-service
+  datasource:
+    driver-class-name: com.mysql.jdbc.Driver
+    url: jdbc:mysql://127.0.0.1:3306/usian?characterEncoding=UTF-8
+    username: root
+    password: 123
+    type: com.alibaba.druid.pool.DruidDataSource
+  redis:
+    cluster:
+      nodes:
+        - 192.168.29.133:7001
+        - 192.168.29.133:7002
+        - 192.168.29.133:7003
+        - 192.168.29.133:7004
+        - 192.168.29.133:7005
+        - 192.168.29.133:7006
+    jedis:
+      pool:
+        max-active: 20  #最大连接数
+        max-idle: 10    #最大空闲连接
+        min-idle: 5     #最小空闲连接
+server:
+  port: 8098
+eureka:
+  client:
+    service-url:
+      defaultZone: http://127.0.0.1:8761/eureka/
+
+USER_INFO: USER_INFO
+SESSION_EXPIRE: 86400

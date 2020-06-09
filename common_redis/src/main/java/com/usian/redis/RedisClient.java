@@ -265,4 +265,21 @@ public class RedisClient {
         }
     }
 
+    /**
+     * 分布式锁
+     * @param key
+     * @param value
+     * @param time
+     * @return
+     */
+    public Boolean setnx(String key, Object value, long time) {
+        try {
+            return redisTemplate.opsForValue().setIfAbsent(key, value, time,
+                    TimeUnit.SECONDS);
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+
 }
