@@ -362,3 +362,24 @@
         public Boolean logOut(String token) {
            return redisClient.del(USER_INFO + ":" + token);
         }
+2020.6.10日报
+    购物车
+                添加购物车商品
+                展示购物车列表页面
+                修改购物车商品数量
+                删除购物车商品
+        未登录状态下：
+            从cookie中查询商品列表Map<itemId,TbItem> 商品购买数量使用TbItem的num保存
+            ​	购物车已存在则直接返回
+            ​   购物车不存在则创建空的购物车并返回
+            添加商品到购物车：
+            ​	如果购物车存在该商品，商品数量相加。
+            ​	如果购物车不存在该商品，根据商品id查询商品信息并添加到购车列表
+            把购车商品列表写入cookie。
+            ​	读写cookie可以使用CookieUtils工具类实现
+
+        登录状态下：
+            使用redis存储商品列表，使用hash对购物车进行归类
+            从redis中查询商品列表
+            将商品添加大购物车中
+            将购物车缓存到redis中
