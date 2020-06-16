@@ -243,7 +243,7 @@ public class CartController {
                 Map<String,TbItem> cart = this.getCartFromRedis(userId);
                 cart.remove(itemId.toString());
                 //将新的购物车缓存到 Redis 中
-                this.addCartToRedis(userId,cart);
+                addCartToRedis(userId,cart);
             }
             return Result.ok();
         } catch (Exception e) {
