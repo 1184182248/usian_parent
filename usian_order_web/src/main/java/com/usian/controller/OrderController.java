@@ -39,4 +39,23 @@ public class OrderController {
         }
         return Result.error("error");
     }
+
+    /**
+     * 创建订单
+     */
+    @RequestMapping("/insertOrder")
+    public Result insertOrder(String orderItem, TbOrder tbOrder , TbOrderShipping
+            tbOrderShipping) {
+        //因为一个request中只包含一个request body. 所以feign不支持多个@RequestBody。
+        OrderInfo orderInfo = new OrderInfo();
+        orderInfo.setOrderItem(orderItem);
+        orderInfo.setTbOrder(tbOrder);
+        orderInfo.setTbOrderShipping(tbOrderShipping);
+        Long orderId = orderServiceFeign.insertOrder(orderInfo);
+        if (orderId != null) {
+            //删除购物车
+            return Result.ok(orderId);
+        }
+        return Result.error("error");
+    }
 }    

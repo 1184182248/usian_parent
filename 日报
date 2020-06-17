@@ -383,3 +383,94 @@
             从redis中查询商品列表
             将商品添加大购物车中
             将购物车缓存到redis中
+2020.6.16日报
+    订单功能：
+        身份认证功能：
+               使用springmvc的拦截器拦截所有订单的请求
+               2、业务逻辑
+                    a)  从cookie中取token。
+                    b) 根据token调用sso服务查询用户信息。
+                    d) 如果查不到用户信息则跳转到登录页面。
+                    e) 查询到用户信息放行。
+               代码：
+                    在结算之前判断用户是否登录
+                    @Component
+                    public class UserLoginInterceptor implements HandlerInterceptor {
+
+                        @Autowired
+                        private SSOServiceFeign ssoServiceFeign;
+
+                        @Override
+                        public boolean preHandle(HttpServletRequest request, HttpServletResponse
+                                response, Object handler) throws Exception {
+                            //对用户的 token 做判断
+                            String token = request.getParameter("token");
+                            if (StringUtils.isBlank(token)) {
+                                return false;
+                            }
+                            //如果用户 token 不为空，则校验用户在 redis 中是否失效
+                            TbUser tbUser = ssoServiceFeign.getUserByToken(token);
+                            if (tbUser == null) {
+                                return false;
+                            }
+                            return true;
+                        }
+                    }
+
+                    /**
+                     * 拦截器配置类
+                     */
+                    @Configuration
+                    public class WebConfig implements WebMvcConfigurer {
+                        @Autowired
+                        private UserLoginInterceptor userLoginInterceptor;
+
+                        /**
+                         * 注册拦截器
+                         * @param registry
+                         */
+                        @Override
+                        public void addInterceptors(InterceptorRegistry registry) {
+                            InterceptorRegistration registration =
+                                    registry.addInterceptor(this.userLoginInterceptor);
+                            //拦截那个 URI
+                            registration.addPathPatterns("/frontend/order/**");
+                        }
+                    }
+
+         展示订单确认页面：
+                1、在购物车页面点击“去结算”按钮跳转到订单确认页面。
+                2、请求的url：/frontend/order/goSettlement
+                3、参数：ids，userId
+                4、查询redis中的购物车数据并返回给前端
+                5、配送地址列表，需要用户登录。需要根据用户id查询收货地址列表。静态数据。
+                6、支付方式。静态数据。
+
+                /**
+                 * 订单服务 Controller
+                 */
+                @RestController
+                @RequestMapping("/frontend/order")
+                public class OrderController {
+
+                    @Autowired
+                    private CartServiceFeign cartServiceFeign;
+
+                    @Autowired
+                    private OrderServiceFeign orderServiceFeign;
+
+                    @RequestMapping("/goSettlement")
+                    public Result goSettlement(String[] ids, String userId) {
+                        //获取购物车
+                        Map<String, TbItem> cart = cartServiceFeign.selectCartByUserId(userId);
+                        //从购物车中获取选中的商品
+                        List<TbItem> list = new ArrayList<TbItem>();
+                        for (String id : ids) {
+                            list.add(cart.get(id));
+                        }
+                        if(list.size()>0) {
+                            return Result.ok(list);
+                        }
+                        return Result.error("error");
+                    }
+                }
