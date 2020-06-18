@@ -474,3 +474,220 @@
                         return Result.error("error");
                     }
                 }
+2020.6.17日报
+    提交订单:
+        生成订单号：时间戳+用户id +店铺id
+        保存订单信息
+            a、在订单确认页面点击“提交订单”按钮生成订单。
+            b、请求的url：/frontend/order/insertOrder
+            c、参数：订单、订单商品、订单物流
+            d、返回值：{"status":200,"msg":"OK","data":"订单ID"}
+
+            @Override
+            public String insertOrder(OrderInfo orderInfo) {
+                //1、解析orderInfo
+                TbOrder tbOrder = orderInfo.getTbOrder();
+                TbOrderShipping tbOrderShipping = orderInfo.getTbOrderShipping();
+                List<TbOrderItem> tbOrderItemList =
+                    JsonUtils.jsonToList(orderInfo.getOrderItem(), TbOrderItem.class);
+
+                //2、保存订单信息
+                if(!redisClient.exists(ORDER_ID_KEY)){
+                    redisClient.set(ORDER_ID_KEY,ORDER_ID_BEGIN);
+                }
+                Long orderId = redisClient.incr(ORDER_ID_KEY, 1L);
+                tbOrder.setOrderId(orderId.toString());
+                Date date = new Date();
+                tbOrder.setCreateTime(date);
+                tbOrder.setUpdateTime(date);
+                //1、未付款，2、已付款，3、未发货，4、已发货，5、交易成功，6、交易关闭
+                tbOrder.setStatus(1);
+                tbOrderMapper.insertSelective(tbOrder);
+
+                //3、保存明细信息
+                if(!redisClient.exists(ORDER_ITEM_ID_KEY)){
+                    redisClient.set(ORDER_ITEM_ID_KEY,0);
+                }
+                for (int i = 0; i < tbOrderItemList.size(); i++) {
+                    Long oderItemId = redisClient.incr(ORDER_ITEM_ID_KEY, 1L);
+                    TbOrderItem tbOrderItem =  tbOrderItemList.get(i);
+                    tbOrderItem.setId(oderItemId.toString());
+                    tbOrderItem.setOrderId(orderId.toString());
+                    tbOrderItemMapper.insertSelective(tbOrderItem);
+                }
+
+                //4、保存物流信息
+                tbOrderShipping.setOrderId(orderId.toString());
+                tbOrderShipping.setCreated(date);
+                tbOrderShipping.setUpdated(date);
+                tbOrderShippingMapper.insertSelective(tbOrderShipping);
+
+                //5、返回订单id
+                return orderId.toString();
+            }
+        }
+
+    扣减库存：
+        将消息写入消息队列，业务逻辑以异步的方式运行，加快响应速度
+            usian_order_service
+                service
+                    @Service
+                    @Transactional
+                    public class OrderServiceImpl implements OrderService {
+                        ... ... ...
+                        @Autowired
+                        private AmqpTemplate amqpTemplate;
+
+                        @Override
+                        public Long insertOrder(OrderInfo orderInfo) {
+                            /************1、向订单表插入数据。********/
+                            ... ... ...
+                            /************2、向订单明细表插入数据********/
+                            ... ... ...
+                            /************3、向订单物流表插入数据。********/
+                            ... ... ...
+
+                            //发布消息到mq，完成扣减库存
+                            amqpTemplate.convertAndSend("order_exchage","order.add", orderId);
+
+                            /************4、返回订单id********/
+                            ... ... ...
+                        }
+                    }
+            usian_item_service
+                service
+                    /**
+                    	 * 修改商品库存数量
+                    	 * @param orderId
+                    	 * @return
+                    	 */
+                        @Override
+                        public Integer updateTbItemByOrderId(String orderId) {
+                            TbOrderItemExample tbOrderItemExample = new TbOrderItemExample();
+                            TbOrderItemExample.Criteria criteria = tbOrderItemExample.createCriteria();
+                            criteria.andOrderIdEqualTo(orderId);
+                            List<TbOrderItem> tbOrderItemList =
+                                	tbOrderItemMapper.selectByExample(tbOrderItemExample);
+                            int result = 0;
+                            for (int i = 0; i < tbOrderItemList.size(); i++) {
+                                TbOrderItem tbOrderItem =  tbOrderItemList.get(i);
+                                TbItem tbItem =
+                                    tbItemMapper.selectByPrimaryKey(Long.valueOf(tbOrderItem.getItemId()));
+                                tbItem.setNum(tbItem.getNum()-tbOrderItem.getNum());
+                                result += tbItemMapper.updateByPrimaryKeySelective(tbItem);
+                            }
+                            return result;
+                        }
+                listener
+                    /**
+                         * 监听者接收消息三要素：
+                         *  1、queue
+                         *  2、exchange
+                         *  3、routing key
+                         */
+                        @RabbitListener(bindings = @QueueBinding(
+                            value = @Queue(value="item_queue",durable = "true"),
+                            exchange = @Exchange(value="order_exchage",type= ExchangeTypes.TOPIC),
+                            key= {"*.*"}
+                        ))
+                        public void listen(String orderId) throws Exception {
+                            System.out.println("接收到消息：" + orderId);
+                            Integer result = itemService.updateTbItemByOrderId(orderId);
+                            if(!(result>0)){
+                                throw new RuntimeException("扣减失败");
+                            }
+                        }
+                    }
+2020.6.18日报
+    关闭超时订单
+       定义job扫描订单表：
+        ​修改订单的状态为关闭状态、结束时间、关闭时间、修改时间为当前时间
+        ​把订单中商品的库存数量加回去
+        ​扫描条件：状态是未付款 并且 创建时间 <= 当前时间 – 2天  并且付款方式为在线支付的订单
+       TbOrderMapper.xml：
+          <select id="selectOvertimeOrder" resultMap="BaseResultMap">
+              SELECT
+                  *
+              FROM
+                  tb_order
+              WHERE
+                  create_time &lt;= DATE_SUB(NOW(), INTERVAL 2 DAY)
+              AND status = 1
+              AND payment_type = 1
+          </select>
+       usian_order_service：
+            //关闭超时订单
+            @Override
+            public void updateOverTimeTbOrder(TbOrder tbOrder) {
+                 tbOrder.setStatus(6);
+                 Date date = new Date();
+                 tbOrder.setCloseTime(date);
+                 tbOrder.setEndTime(date);
+                 tbOrder.setUpdateTime(date);
+                 tbOrderMapper.updateByPrimaryKeySelective(tbOrder);
+             }
+       usian_order_quartz:
+             @Override
+             public void execute(JobExecutionContext context) throws JobExecutionException {
+                   //1、查询超时订单
+                   List<TbOrder> tbOrderList = orderService.selectOverTimeTbOrder();
+
+                   //2、关闭超时订单
+                   for (int i = 0; i < tbOrderList.size(); i++) {
+                        TbOrder tbOrder =  tbOrderList.get(i);
+                        orderService.updateOverTimeTbOrder(tbOrder);
+                   //3、把超时订单中的商品库存数量加回去
+                   orderService.updateTbItemByOrderId(tbOrder.getOrderId());
+                        }
+                    }
+       usian_order_config:
+            	@Bean
+            	public JobDetailFactoryBean jobDetailFactoryBean(){
+            		JobDetailFactoryBean factory = new JobDetailFactoryBean();
+            		//关联我们自己的Job类
+            		factory.setJobClass(OrderQuartz.class);
+            		return factory;
+            	}
+
+               @Bean
+            	public CronTriggerFactoryBean cronTriggerFactoryBean(JobDetailFactoryBean
+                                                                     jobDetailFactoryBean){
+            		CronTriggerFactoryBean factory = new CronTriggerFactoryBean();
+            		factory.setJobDetail(jobDetailFactoryBean.getObject());
+            		//设置触发时间
+            		//factory.setCronExpression("0/2 * * * * ?");
+            	    factory.setCronExpression("0 */1 * * * ?");
+            		return factory;
+            	}
+
+            	@Bean
+            	public SchedulerFactoryBean schedulerFactoryBean(CronTriggerFactoryBean
+            					cronTriggerFactoryBean, MyAdaptableJobFactory myAdaptableJobFactory){
+            		SchedulerFactoryBean factory = new SchedulerFactoryBean();
+            		//关联trigger
+            		factory.setTriggers(cronTriggerFactoryBean.getObject());
+            		factory.setJobFactory(myAdaptableJobFactory);
+            		return factory;
+            	}
+    quartz集群任务重复执行问题
+        使用redis分布式锁解决quartz 集群任务重复执行的问题
+            //关闭超时订单
+        	@Override
+        	public void execute(JobExecutionContext context) throws JobExecutionException {
+        		String ip = null;
+        		try {
+        			ip = InetAddress.getLocalHost().getHostAddress();
+        		} catch (UnknownHostException e) {
+        			e.printStackTrace();
+        		}
+        		//解决quartz集群任务重复执行
+        		if(redisClient.setnx("SETNX_LOCK_ORDER_KEY",ip,30)) {
+        			//... ... ... 关闭超时订单业务
+        			redisClient.del("SETNX_LOCK_ORDER_KEY");
+        		}else{
+        			System.out.println(
+                        "============机器："+ip+" 占用分布式锁，任务正在执行=======================");
+        		}
+
+        	}
+        }

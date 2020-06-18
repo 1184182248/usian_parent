@@ -1,12 +1,10 @@
 package com.usian.service;
 
+import com.usian.mapper.TbItemMapper;
 import com.usian.mapper.TbOrderItemMapper;
 import com.usian.mapper.TbOrderMapper;
 import com.usian.mapper.TbOrderShippingMapper;
-import com.usian.pojo.OrderInfo;
-import com.usian.pojo.TbOrder;
-import com.usian.pojo.TbOrderItem;
-import com.usian.pojo.TbOrderShipping;
+import com.usian.pojo.*;
 import com.usian.redis.RedisClient;
 import com.usian.utils.JsonUtils;
 import org.springframework.amqp.core.AmqpTemplate;
@@ -39,6 +37,9 @@ public class OrderServiceImpl implements OrderService{
 
     @Autowired
     private TbOrderItemMapper tbOrderItemMapper;
+
+    @Autowired
+    private TbItemMapper tbItemMapper;
 
     @Autowired
     private AmqpTemplate amqpTemplate;
@@ -90,5 +91,53 @@ public class OrderServiceImpl implements OrderService{
 
         //6、返回订单id
         return orderId;
+    }
+
+
+    /**
+     * 关闭超时订单
+     * @param tbOrder
+     */
+    @Override
+    public void updateOverTimeTbOrder(TbOrder tbOrder) {
+        tbOrder.setStatus(6);
+        Date date = new Date();
+        tbOrder.setCloseTime(date);
+        tbOrder.setEndTime(date);
+        tbOrder.setUpdateTime(date);
+        tbOrderMapper.updateByPrimaryKeySelective(tbOrder);
+    }
+
+    /**
+     * 把订单中商品的库存数量加回去
+     * @param orderId
+     */
+    @Override
+    public void updateTbItemByOrderId(String orderId) {
+        //1、通过orderId查询LisT<TbOrderItem>
+        TbOrderItemExample tbOrderItemExample = new TbOrderItemExample();
+        TbOrderItemExample.Criteria criteria = tbOrderItemExample.createCriteria();
+        criteria.andOrderIdEqualTo(orderId);
+        List<TbOrderItem> tbOrderItemList =
+                tbOrderItemMapper.selectByExample(tbOrderItemExample);
+        for (int i = 0; i < tbOrderItemList.size(); i++) {
+            TbOrderItem tbOrderItem =  tbOrderItemList.get(i);
+            //2、修改商品库存
+            TbItem tbItem =
+                    tbItemMapper.selectByPrimaryKey(Long.valueOf(tbOrderItem.getItemId()));
+            tbItem.setNum(tbItem.getNum()+tbOrderItem.getNum());
+            tbItem.setUpdated(new Date());
+            tbItemMapper.updateByPrimaryKey(tbItem);
+        }
+    }
+
+
+    /**
+     * 查询超时订单
+     * @return
+     */
+    @Override
+    public List<TbOrder> selectOverTimeOrder() {
+        return tbOrderMapper.selectOverTimeOrder();
     }
 }
