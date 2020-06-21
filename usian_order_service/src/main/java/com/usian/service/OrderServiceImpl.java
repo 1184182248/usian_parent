@@ -1,9 +1,7 @@
 package com.usian.service;
 
-import com.usian.mapper.TbItemMapper;
-import com.usian.mapper.TbOrderItemMapper;
-import com.usian.mapper.TbOrderMapper;
-import com.usian.mapper.TbOrderShippingMapper;
+import com.usian.mapper.*;
+import com.usian.mq.MQSender;
 import com.usian.pojo.*;
 import com.usian.redis.RedisClient;
 import com.usian.utils.JsonUtils;
@@ -15,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Date;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @Transactional
@@ -42,6 +41,12 @@ public class OrderServiceImpl implements OrderService{
     private TbItemMapper tbItemMapper;
 
     @Autowired
+    private LocalMessageMapper localMessageMapper;
+
+    @Autowired
+    private MQSender mqSender;
+
+    @Autowired
     private AmqpTemplate amqpTemplate;
 
     @Autowired
@@ -49,13 +54,13 @@ public class OrderServiceImpl implements OrderService{
 
     @Override
     public Long insertOrder(OrderInfo orderInfo) {
-        //1、解析orderInfo
+        //解析orderInfo
         TbOrder tbOrder = orderInfo.getTbOrder();
         TbOrderShipping tbOrderShipping = orderInfo.getTbOrderShipping();
         List<TbOrderItem> tbOrderItemList = 
             JsonUtils.jsonToList(orderInfo.getOrderItem(), TbOrderItem.class);
 
-        //2、保存订单信息
+        //保存订单信息
         if(!redisClient.exists(ORDER_ID_KEY)){
             redisClient.set(ORDER_ID_KEY,ORDER_ID_BEGIN);
         }
@@ -68,7 +73,7 @@ public class OrderServiceImpl implements OrderService{
         tbOrder.setStatus(1);
         tbOrderMapper.insertSelective(tbOrder);
 
-        //3、保存明细信息
+        //保存明细信息
         if(!redisClient.exists(ORDER_ITEM_ID_KEY)){
             redisClient.set(ORDER_ITEM_ID_KEY,0);
         }
@@ -80,16 +85,25 @@ public class OrderServiceImpl implements OrderService{
             tbOrderItemMapper.insertSelective(tbOrderItem);
         }
 
-        //4、保存物流信息
+        //保存物流信息
         tbOrderShipping.setOrderId(orderId.toString());
         tbOrderShipping.setCreated(date);
         tbOrderShipping.setUpdated(date);
         tbOrderShippingMapper.insertSelective(tbOrderShipping);
 
-        //5、发布消息到mq，完成扣减库存
-        amqpTemplate.convertAndSend("order_exchage","order.add", orderId);
+        //保存本地消息记录
+        LocalMessage localMessage = new LocalMessage();
+        localMessage.setTxNo(UUID.randomUUID().toString());
+        localMessage.setOrderNo(orderId.toString());
+        localMessage.setState(0);
+        localMessageMapper.insertSelective(localMessage);
 
-        //6、返回订单id
+        //发布消息到mq，完成扣减库存
+        amqpTemplate.convertAndSend("order_exchage","order.add", orderId);
+        //发布消息到mq，完成扣减库存
+        mqSender.sendMsg(localMessage);
+
+        //返回订单id
         return orderId;
     }
 
