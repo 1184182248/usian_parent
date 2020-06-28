@@ -1,5 +1,6 @@
 package com.usian.feign;
 
+import com.usian.fallback.ItemServiceFallback;
 import com.usian.pojo.*;
 import com.usian.utils.CatResult;
 import com.usian.utils.PageResult;
@@ -9,7 +10,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 
-@FeignClient(value = "usian-item-service")
+@FeignClient(value = "usian-item-service",fallbackFactory = ItemServiceFallback.class)
 public interface ItemServiceFeignClient {
     @RequestMapping("/service/item/selectItemInfo")
     TbItem selectItemInfo(@RequestParam("itemId") Long itemId);
@@ -17,6 +18,8 @@ public interface ItemServiceFeignClient {
     @GetMapping("/service/item/selectTbItemAllByPage")
     PageResult selectTbItemAllByPage(@RequestParam("page") Integer page,
                                      @RequestParam("rows") Long rows);
+
+
 
     @RequestMapping("/service/itemCategory/selectItemCategoryByParentId")
     List<TbItemCat> selectItemCategoryByParentId(@RequestParam Long id);
@@ -43,6 +46,7 @@ public interface ItemServiceFeignClient {
     @RequestMapping("/service/itemParam/selectItemParamAll")
     PageResult selectItemParamAll(@RequestParam("page") Integer page,
                                   @RequestParam("rows") Integer rows);
+
 
     @RequestMapping("/service/itemCategory/selectItemCategoryAll")
     CatResult selectItemCategoryAll();

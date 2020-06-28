@@ -24,7 +24,11 @@ public class ItemCategoryServiceImpl implements ItemCategoryService{
     @Value("${portal_catresult_redis_key}")
     private String portal_catresult_redis_key;
 
-
+    /**
+     * 根据分类ID查询子节点
+     * @param id
+     * @return
+     */
     @Override
     public List<TbItemCat> selectItemCategoryByParentId(Long id) {
         TbItemCatExample example = new TbItemCatExample();
@@ -32,6 +36,9 @@ public class ItemCategoryServiceImpl implements ItemCategoryService{
         criteria.andParentIdEqualTo(id);
         criteria.andStatusEqualTo(1);
         List<TbItemCat> list = tbItemCatMapper.selectByExample(example);
+        if (id!=0){
+            int a = 6 / 0;
+        }
         return list;
     }
     /**

@@ -776,3 +776,165 @@
             - Elasticsearch：是开源的分布式全文检索服务器。
             - Logstash：是一个具有实时传输能力的数据收集引擎，用来进行数据收集（如：读取文本文件）、解析，并将数据发送给ES。
             - Kibana：数据分析与可视化平台，对Elasticsearch存储的数据进行可视化分析，通过表格的形式展现出来。
+2020.6.23日报
+    网管服务
+        路由：所有请求都通过网关访问服务的consumer
+            usian-manage-web
+                修改vue.config.js： target: 'http://127.0.0.1:7070
+                修改src/api/base.js
+                     basePrductUrl:"/product_api/backend_item",
+                     baseContentUrl:"/content_api/backend_content",
+                     baseSearchUrl:"/search_api/frontend_search",
+            common_zuul
+                application.yml
+                    zuul:
+                      sensitive-headers: true #全局配置，解决在网关服务中不传递请求头的问题
+                      routes:
+                        usian-item-web:
+                          path: /backend_item/**
+                        usian-content-web:
+                          path: /backend_content/**
+                        usian-search-web:
+                          path: /frontend_search/**
+            usian-portal-web
+                修改 vue.config.js： target: 'http://127.0.0.1:7070',
+                修改src/api/base.js
+                    baseUrl: '/api/frontend_portal',
+                    shopcarBaseUrl: "/shopcar_api/frontend_cart",
+                    searchBaseUrl: "/search_api/frontend_search",
+                    detailBaseUrl: "/detail_api/frontend_detail",
+                    registerBaseUrl: "/register_api/frontend_sso",
+                    payMentBaseUrl:"/payment_api/frontend_order",
+
+        容错：客户端通过zuul无法调用consumer时，使用zuul对consumer进行降级
+            common_zuul
+                com.usian.fallback
+                     //设置响应的头信息
+                     @Override
+                     public HttpHeaders getHeaders() {
+                     HttpHeaders header = new HttpHeaders();
+                     MediaType mt = new MediaType("application","json", Charset.forName("utf-8"));
+                     header.setContentType(mt);
+                      return header;
+                            }
+                      //设置响应体
+                       @Override
+                       public InputStream getBody() throws IOException {
+                            String content = "该服务暂时不可用，请稍后重试";
+                            return new ByteArrayInputStream(content.getBytes());
+                                 }
+        限流：使用令牌桶算法实现zuul对consumer的限流
+            common_zuul
+                com.usian.filter
+                     @Override
+                        public Object run() throws ZuulException {
+                            //是否能从令牌桶中获取到令牌
+                            if (!RATE_LIMIT.tryAcquire()) {
+                                RequestContext requestContext =
+                                        RequestContext.getCurrentContext();
+                                requestContext.setSendZuulResponse(false);
+                                requestContext.setResponseBody(JsonUtils.objectToJson(
+                                    		Result.error("访问太多频繁，请稍后再访问！！！")));
+                                requestContext.getResponse().setContentType("application/json; charset=utf-8");
+                            }
+                            return null;
+                        }
+    熔断处理
+        降级：通过 Hystrix 对provider做降级处理
+            usian_item_feign
+                com.usian.feign
+                    @FeignClient(value = "usian-item-service",fallbackFactory = ItemServiceFallback.class)
+        熔断：通过 Hystrix 对provider做熔断处理
+            usian_item_web
+                application.yml
+                    feign:
+                      hystrix:
+                        enabled: true #开启降级处理
+2020.6.24日报
+	一、mysql主从复制（安装mysql）
+ 		linux安装mysql
+		查看已安装mysql：rpm -qa|grep mysql
+		卸载：rpm -e --nodeps mysql-libs-5.1.7.1-1.e16.x86_64
+		解压安装包到指定文件夹：tar -zxvf mysql-5.6.31-linux-glibc2.5-x86_64.tar.gz -C /usr/java
+		进入/usr/java：cd /usr/java
+		改名mysql：mv mysql-5.6.31-linux-glibc2.5-x86_64 mysql
+		复制mysql配置文件：cd mysql
+				cp support-files/my-default.cnf /etc/my.cnf
+				cp support-files/mysql.server /etc/rc.d/init.d/mysql
+		修改my.cnf  vim /etc/my.cnf
+		          	basedir = /usr/java/mysql
+			datadir = /usr/java/mysql/data
+			log-error = /usr/java/mysql/data/error.log
+			pid-file = /usr/java/mysql/data/mysql.pid
+			user = root
+			tmpdir = /tmp
+		初始化mysql：./scripts/mysql_install_db --user=root --basedir=/usr/java/mysql --datadir=/usr/java/mysql/data --pid-file=/usr/java/mysql/data/mysql.pid --tmpdir=/tmp
+		启动mysql：service mysql start
+		关闭mysql：service mysql stop
+		重启mydql：service mysql restart
+		修改MySQL密码：mysql -u root
+			            use mysql
+			            update user set password= password("1111") where user='root';
+			            flush privileges;
+		开放远程登陆权限：GRANT ALL PRIVILEGES ON *.* TO 'root'@'%' IDENTIFIED BY '1111' WITH GRANT OPTION;
+ 				FLUSH PRIVILEGES;
+	二、mysql主从复制（配置）
+		主从复制简介
+		1. MySQL 默认支持主(master)从(slave)功能.
+		2. 主从复制效果：在主数据库中操作时,从同步进行变化.
+		3. 主从复制本质：主数据的操作写入到日志中,从数据库从日志中读取,进行操作.
+		主从复制要素
+		1. 开启日志功能
+   		2. 每个数据库需要有一个 server_id,主 server_id 值小于从server_id(标识从哪server写入的)
+   		3. 每个 mysql 都有一个 uuid,由于虚拟机直接进行克隆,需要修改uuid 的值(唯一识别码)
+   		4. 必须要在主数据库中有一个用户具有被从数据库操作的权限.
+		配置主从复制
+		配置主数据库
+		1.修改主数据库my.cnf
+		  log_bin=master_log
+		  server_id=1
+		2.重启mysql：service mysql restart
+		3.通过命令可以观察主数据库在主从关系中状态: show master status
+		配置从数据库
+		1.修改server_id: server_id=2
+		2.data文件夹auto.cnf编写当前mysql的uuid
+		3.重启 mysql servIce：service mysql restart
+		4.修改slave：
+		 stop slave;
+		change master to master_host='主ip',master_user='root',master_password='1111',master_log_file='master_log.000001';
+		start slave
+		5.查看slave状态：首位slavestatus \G;
+		6.验证主从关系：在主数据库中新建数据库,新建表,添加数据,观察从数据库的
+	二、mycat
+		1、什么是Mycat：是一个国产的数据库中间件，前身是阿里的cobar
+		2、分库分表：
+		垂直分割（分库）：指按照业务将表进行分类，分布到不同的数据库上面，这样也就将数据或者说压力分担到不同的库上面
+		水平分割（分表）：一个表格的数据按照行分割到多个节点上
+		典型的分片规则：根据主键编号进行hash、求余
+		3、mycat安装
+			1.下载mycat并上传到linux：官方网站：http://www.mycat.org.cn
+			2.解压mycat
+				tar -zxvf Mycat-server-1.6-RELEASE-20161028204710-linux.tar.gz -C /usr/java
+			3.启动和关闭mycat
+				启动：./mycat start
+				停止：./mycat stop
+				重启：./mycat restart
+				查看状态：./mycat status
+			4.mycat重要概念：
+				1、逻辑库（schema）：一个包含了所有数据库的逻辑上的数据库
+				2、逻辑表（table）：一个包含了所有表的逻辑上的表
+				3、数据主机（dataHost）：数据库软件安装到哪个服务器上
+				4、数据节点（dataNode）：数据库软件中的 database
+				5、分片规则（rule）：拆分规则
+		4、分片规则
+			1.auto-sharding-long 规则
+				以 500 万为单位,实现分片规则：
+				1-500 万保存在 db1 中, 500 万零 1 到 1000 万保存在 db2 中,1000 万零 1 到 1500 万保存在 db3 中
+			2.crc32slot规则：在 CRUD 操作时,根据具体数据的 crc32 算法计算,数据应该保存在哪一个dataNode 中
+				分片字段使用主键
+				tableRule：一个表一个
+				数据库节点数量
+		5、配置mycat的分库分表和读写分离
+			1、schema.xml作用：逻辑库、逻辑表、dataNode、分片规则
+			2、rule.xml：分片规则
+			3、server.xml：mycat的用户名、密码和权限

@@ -1,0 +1,9 @@
+server:
+  port: 3344
+
+spring:
+  cloud:
+    config:
+      server:
+        git:
+          uri: https://github.com/1184182248/usian-config.git

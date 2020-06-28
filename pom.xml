@@ -35,6 +35,8 @@
         <module>usian_order_service</module>
         <module>usian_order_feign</module>
         <module>usian_order_web</module>
+        <module>common_zuul</module>
+        <module>common_config</module>
     </modules>
     <!--Spring Boot 父工程-->
     <parent>
